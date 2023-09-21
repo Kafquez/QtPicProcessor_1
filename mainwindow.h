@@ -29,10 +29,6 @@ private slots:
     void on_actResize_triggered();
     void on_actShake_triggered();
 
-
-
-
-
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -53,12 +49,15 @@ private:
     QLineEdit *editImg_SizeByte_2;
     QString saveDir; // 声明 saveDir 成员变量
     QStringList fileSuffixes; // 用于存储文件名后缀
-
+    int savedImagesCount = 0;
     // 声明 showImageFeatures 函数
     void showImageFeatures(bool formatChanged = false);
 
     // 添加成员变量 m_filename
     QString m_filename;
+
+    // 声明 saveAndAppendSuffix 函数
+    void saveAndAppendSuffix(const QImage &image, const QString &suffix);
 
 private:
     Ui::MainWindow *ui;

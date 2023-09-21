@@ -19,6 +19,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     // 开启 QLabel 的鼠标跟踪，以便后续的拖拽操作
+    // 设置窗口标题
+    setWindowTitle("图片预处理程序");
     // 初始化 saveDir
     saveDir = "";
     ui->sampLabel->setMouseTracking(true);
@@ -126,56 +128,22 @@ void MainWindow::on_actOpen_triggered()
 }
 
 
-
-
-
-void MainWindow::on_actRanCrop_triggered()
+void MainWindow::saveAndAppendSuffix(const QImage &image, const QString &suffix)
 {
-    // 清空等待保存的图片列表
-    waitingToSaveImages.clear();
-    fileSuffixes.clear(); // 清空后缀列表
+    // 构建带有后缀的文件名
+    QString fileName = QString("image_%1%2.jpg").arg(savedImagesCount + 1).arg(suffix);
 
-    // 遍历所有已打开的图片并进行随机裁剪
-    for (int i = 0; i < openedImages.size(); ++i) {
-        QImage image = openedImages[i];
-        int width = image.width();
-        int height = image.height();
-
-        // 随机裁剪的左上角坐标
-        int x = QRandomGenerator::global()->bounded(width);
-        int y = QRandomGenerator::global()->bounded(height);
-
-        // 随机裁剪的宽度和高度
-        int cropWidth = QRandomGenerator::global()->bounded(width - x);
-        int cropHeight = QRandomGenerator::global()->bounded(height - y);
-
-        QImage croppedImage = image.copy(x, y, cropWidth, cropHeight);
-        if (!croppedImage.isNull()) {
-            // 构建带有后缀的文件名
-            QString fileName = QString("image_%1_rancrop.jpg").arg(i + 1);
-
-            // 保存图像
-            if (croppedImage.save(fileName)) {
-                waitingToSaveImages.append(croppedImage);
-                fileSuffixes.append("_rancrop"); // 添加后缀到列表中
-            } else {
-                QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-            }
-        }
+    // 保存图像
+    if (image.save(fileName)) {
+        waitingToSaveImages.append(image);
+        fileSuffixes.append(suffix); // 添加后缀到列表中
+        savedImagesCount++;
+    } else {
+        QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
     }
-
-    // 将处理后的图片设置为示例图片
-    if (!waitingToSaveImages.isEmpty()) {
-        m_image = waitingToSaveImages.first();
-        QPixmap pixmap = QPixmap::fromImage(m_image);
-        ui->sampLabel->setPixmap(pixmap.scaled(ui->sampLabel->size(), Qt::KeepAspectRatio));
-
-        // 刷新图片属性
-        showImageFeatures(true);
-    }
-
-    QMessageBox::information(this, tr("提示"), tr("已随机裁剪 %1 张图片。").arg(waitingToSaveImages.size()));
 }
+
+
 
 
 
@@ -239,6 +207,45 @@ void MainWindow::on_actSave_triggered()
     QMessageBox::information(this, tr("提示"), tr("已保存 %1 张图片到 %2 目录。").arg(waitingToSaveImages.size()).arg(saveDir));
 }
 
+void MainWindow::on_actRanCrop_triggered()
+{
+    // 清空等待保存的图片列表
+    waitingToSaveImages.clear();
+    fileSuffixes.clear(); // 清空后缀列表
+    savedImagesCount = 0;
+
+    // 遍历所有已打开的图片并进行随机裁剪
+    for (int i = 0; i < openedImages.size(); ++i) {
+        QImage image = openedImages[i];
+        int width = image.width();
+        int height = image.height();
+
+        // 随机裁剪的左上角坐标
+        int x = QRandomGenerator::global()->bounded(width);
+        int y = QRandomGenerator::global()->bounded(height);
+
+        // 随机裁剪的宽度和高度
+        int cropWidth = QRandomGenerator::global()->bounded(width - x);
+        int cropHeight = QRandomGenerator::global()->bounded(height - y);
+
+        QImage croppedImage = image.copy(x, y, cropWidth, cropHeight);
+        if (!croppedImage.isNull()) {
+            saveAndAppendSuffix(croppedImage, "_rancrop"); // 保存并添加后缀
+        }
+    }
+
+    // 将处理后的图片设置为示例图片
+    if (!waitingToSaveImages.isEmpty()) {
+        m_image = waitingToSaveImages.first();
+        QPixmap pixmap = QPixmap::fromImage(m_image);
+        ui->sampLabel->setPixmap(pixmap.scaled(ui->sampLabel->size(), Qt::KeepAspectRatio));
+
+        // 刷新图片属性
+        showImageFeatures(true);
+    }
+
+    QMessageBox::information(this, tr("提示"), tr("已随机裁剪 %1 张图片。").arg(waitingToSaveImages.size()));
+}
 
 void MainWindow::on_actFlip_triggered()
 {
@@ -250,18 +257,9 @@ void MainWindow::on_actFlip_triggered()
     for (int i = 0; i < openedImages.size(); ++i) {
         QImage image = openedImages[i];
         QImage flippedImage = image.mirrored(true, false); // 镜像翻转（水平翻转）
-        if (!flippedImage.isNull()) {
-            // 构建带有后缀的文件名
-            QString fileName = QString("image_%1_flip.jpg").arg(i + 1);
 
-            // 保存图像
-            if (flippedImage.save(fileName)) {
-                waitingToSaveImages.append(flippedImage);
-                fileSuffixes.append("_flip"); // 添加后缀到列表中
-            } else {
-                QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-            }
-        }
+        // 调用保存和添加后缀的函数
+        saveAndAppendSuffix(flippedImage, "_flip");
     }
 
     // 将处理后的图片设置为示例图片
@@ -299,18 +297,8 @@ void MainWindow::on_actRotate_triggered()
             transform.rotate(rotationAngle);
             QImage rotatedImage = image.transformed(transform, Qt::FastTransformation);
 
-            if (!rotatedImage.isNull()) {
-                // 构建带有后缀的文件名
-                QString fileName = QString("image_%1_rotate.jpg").arg(i + 1);
-
-                // 保存图像
-                if (rotatedImage.save(fileName)) {
-                    waitingToSaveImages.append(rotatedImage);
-                    fileSuffixes.append("_rotate"); // 添加后缀到列表中
-                } else {
-                    QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-                }
-            }
+            // 调用保存和添加后缀的函数
+            saveAndAppendSuffix(rotatedImage, "_rotate");
         }
 
         // 将处理后的图片设置为示例图片
@@ -326,6 +314,7 @@ void MainWindow::on_actRotate_triggered()
         QMessageBox::information(this, tr("提示"), tr("已旋转 %1 张图片。").arg(waitingToSaveImages.size()));
     }
 }
+
 
 
 
@@ -366,18 +355,8 @@ void MainWindow::on_actEnhance_triggered()
             }
         }
 
-        if (!enhancedImage.isNull()) {
-            // 构建带有后缀的文件名
-            QString fileName = QString("image_%1_enhance.jpg").arg(i + 1);
-
-            // 保存图像
-            if (enhancedImage.save(fileName)) {
-                waitingToSaveImages.append(enhancedImage);
-                fileSuffixes.append("_enhance"); // 添加后缀到列表中
-            } else {
-                QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-            }
-        }
+        // 调用保存和添加后缀的函数
+        saveAndAppendSuffix(enhancedImage, "_enhance");
     }
 
     // 将处理后的图片设置为示例图片
@@ -392,6 +371,7 @@ void MainWindow::on_actEnhance_triggered()
 
     QMessageBox::information(this, tr("提示"), tr("已进行亮度增强处理，亮度值：%1").arg(brightnessFactor));
 }
+
 
 
 
@@ -426,18 +406,8 @@ void MainWindow::on_actResize_triggered()
             QImage image = openedImages[i];
             QImage scaledImage = image.scaled(image.width() * scaleFactor, image.height() * scaleFactor, Qt::KeepAspectRatio);
 
-            if (!scaledImage.isNull()) {
-                // 构建带有后缀的文件名
-                QString fileName = QString("image_%1_scale.jpg").arg(i + 1);
-
-                // 保存图像
-                if (scaledImage.save(fileName)) {
-                    waitingToSaveImages.append(scaledImage);
-                    fileSuffixes.append("_scale"); // 添加后缀到列表中
-                } else {
-                    QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-                }
-            }
+            // 调用保存和添加后缀的函数
+            saveAndAppendSuffix(scaledImage, "_scale");
         }
 
         // 将处理后的图片设置为示例图片
@@ -453,15 +423,13 @@ void MainWindow::on_actResize_triggered()
         QMessageBox::information(this, tr("提示"), tr("已进行等比例缩放，缩放比例：%1").arg(scaleFactor));
     } else if (choice == tr("指定尺寸")) {
         // 用户选择指定尺寸
-        int targetWidth = QInputDialog::getInt(this, tr("输入宽度"), tr("请输入目标宽度："), 100, 1, 10000, 1, &ok);
-
+        int newWidth = QInputDialog::getInt(this, tr("输入宽度"), tr("请输入新的宽度："), m_image.width(), 1, 5000, 1, &ok);
         if (!ok) {
             // 用户取消了输入
             return;
         }
 
-        int targetHeight = QInputDialog::getInt(this, tr("输入高度"), tr("请输入目标高度："), 100, 1, 10000, 1, &ok);
-
+        int newHeight = QInputDialog::getInt(this, tr("输入高度"), tr("请输入新的高度："), m_image.height(), 1, 5000, 1, &ok);
         if (!ok) {
             // 用户取消了输入
             return;
@@ -471,23 +439,13 @@ void MainWindow::on_actResize_triggered()
         waitingToSaveImages.clear();
         fileSuffixes.clear(); // 清空后缀列表
 
-        // 遍历所有已打开的图片并进行指定尺寸处理
+        // 遍历所有已打开的图片并进行指定尺寸缩放处理
         for (int i = 0; i < openedImages.size(); ++i) {
             QImage image = openedImages[i];
-            QImage scaledImage = image.scaled(targetWidth, targetHeight, Qt::KeepAspectRatio);
+            QImage scaledImage = image.scaled(newWidth, newHeight, Qt::KeepAspectRatio);
 
-            if (!scaledImage.isNull()) {
-                // 构建带有后缀的文件名
-                QString fileName = QString("image_%1_resize.jpg").arg(i + 1);
-
-                // 保存图像
-                if (scaledImage.save(fileName)) {
-                    waitingToSaveImages.append(scaledImage);
-                    fileSuffixes.append("_resize"); // 添加后缀到列表中
-                } else {
-                    QMessageBox::information(this, tr("提示"), tr("保存图片失败：%1").arg(fileName));
-                }
-            }
+            // 调用保存和添加后缀的函数
+            saveAndAppendSuffix(scaledImage, "_resize");
         }
 
         // 将处理后的图片设置为示例图片
@@ -500,70 +458,33 @@ void MainWindow::on_actResize_triggered()
             showImageFeatures(true);
         }
 
-        QMessageBox::information(this, tr("提示"), tr("已进行指定尺寸缩放，目标尺寸：%1x%2").arg(targetWidth).arg(targetHeight));
+        QMessageBox::information(this, tr("提示"), tr("已进行指定尺寸缩放，新宽度：%1，新高度：%2").arg(newWidth).arg(newHeight));
     }
 }
 
-void MainWindow::on_actShake_triggered()
-{
-    if (openedImages.isEmpty()) {
-        QMessageBox::information(this, tr("提示"), tr("没有打开的图片。"));
-        return;
-    }
-
-    // 弹出对话框，要求用户输入抖动强度
-    bool ok;
-    int shakeStrength = QInputDialog::getInt(this, tr("输入抖动强度"), tr("请输入抖动强度："), 1, 1, 255, 1, &ok);
-    if (!ok) {
-        return; // 用户取消了操作
-    }
-
-    // 应用颜色抖动算法到示例图片
-    m_image = applyColorShake(m_image, shakeStrength);
-
-    // 将处理后的图片设置到 sampLabel 上，保持原长宽比
-    QPixmap pixmap = QPixmap::fromImage(m_image);
-    ui->sampLabel->setPixmap(pixmap.scaled(ui->sampLabel->size(), Qt::KeepAspectRatio));
-
-    // 清空等待保存的图片列表
-    waitingToSaveImages.clear();
-    fileSuffixes.clear(); // 清空后缀列表
-    waitingToSaveImages.append(m_image);
-    fileSuffixes.append("_shake"); // 添加后缀到列表中
-
-    QMessageBox::information(this, tr("提示"), tr("已应用颜色抖动。"));
-}
 
 
 QImage MainWindow::applyColorShake(const QImage &image, int strength)
 {
-    QImage shakenImage = image.copy(); // 复制原图像
-
-    if (shakenImage.isNull()) {
-        return QImage();
-    }
+    QImage shakenImage = image;
 
     for (int y = 0; y < shakenImage.height(); ++y) {
         for (int x = 0; x < shakenImage.width(); ++x) {
-            // 获取当前像素的颜色
             QColor pixelColor = shakenImage.pixelColor(x, y);
 
-            // 随机生成抖动值
-            int redShake = QRandomGenerator::global()->bounded(-strength, strength + 1);
-            int greenShake = QRandomGenerator::global()->bounded(-strength, strength + 1);
-            int blueShake = QRandomGenerator::global()->bounded(-strength, strength + 1);
+            // Generate random values for color channel shake
+            int redShake = rand() % (2 * strength) - strength;
+            int greenShake = rand() % (2 * strength) - strength;
+            int blueShake = rand() % (2 * strength) - strength;
 
-            // 对颜色的RGB分量应用抖动
             int newRed = qBound(0, pixelColor.red() + redShake, 255);
             int newGreen = qBound(0, pixelColor.green() + greenShake, 255);
             int newBlue = qBound(0, pixelColor.blue() + blueShake, 255);
 
-            // 设置新的像素颜色
             pixelColor.setRed(newRed);
             pixelColor.setGreen(newGreen);
             pixelColor.setBlue(newBlue);
 
-            // 更新图像的像素值
             shakenImage.setPixelColor(x, y, pixelColor);
         }
     }
@@ -571,6 +492,43 @@ QImage MainWindow::applyColorShake(const QImage &image, int strength)
     return shakenImage;
 }
 
+void MainWindow::on_actShake_triggered()
+{
+    // 获取用户输入的抖动强度
+    bool ok;
+    int shakeStrength = QInputDialog::getInt(this, tr("输入抖动强度"), tr("请输入抖动强度："), 25, 1, 100, 1, &ok);
 
+    if (!ok) {
+        // 用户取消了输入
+        return;
+    }
 
+    // 清空等待保存的图片列表
+    waitingToSaveImages.clear();
+    fileSuffixes.clear(); // 清空后缀列表
+
+    // Seed the random number generator
+    srand(time(nullptr));
+
+    // 遍历所有已打开的图片并进行颜色抖动处理
+    for (int i = 0; i < openedImages.size(); ++i) {
+        QImage image = openedImages[i];
+        QImage shakenImage = applyColorShake(image, shakeStrength);
+
+        // 调用保存和添加后缀的函数
+        saveAndAppendSuffix(shakenImage, "_shake");
+    }
+
+    // 将处理后的图片设置为示例图片
+    if (!waitingToSaveImages.isEmpty()) {
+        m_image = waitingToSaveImages.first();
+        QPixmap pixmap = QPixmap::fromImage(m_image);
+        ui->sampLabel->setPixmap(pixmap.scaled(ui->sampLabel->size(), Qt::KeepAspectRatio));
+
+        // 刷新图片属性
+        showImageFeatures(true);
+    }
+
+    QMessageBox::information(this, tr("提示"), tr("已进行颜色抖动处理，抖动强度：%1").arg(shakeStrength));
+}
 
